@@ -1,0 +1,57 @@
+name: Download MOEX Blue Chips
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/download-moex-bluechips.yml'
+      - 'scripts/download_moex_bluechips.py'
+      - 'TRIGGER_MOEX_BLUECHIPS'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip pandas requests
+
+      - name: Download official MOEX blue-chip trading data
+        run: |
+          python scripts/download_moex_bluechips.py \
+            --out output/MOEX_Blue_Chips_Trading_Data \
+            --from-date 1990-01-01 \
+            --till-date "$(date -u +%F)"
+
+      - name: Show output summary
+        run: |
+          find output -maxdepth 4 -type f -printf '%p %s bytes\n' | sort
+          echo '--- quality ---'
+          cat output/MOEX_Blue_Chips_Trading_Data/quality/quality_report.csv || true
+          echo '--- errors ---'
+          cat output/MOEX_Blue_Chips_Trading_Data/quality/download_errors.csv || true
+
+      - name: Upload data package
+        uses: actions/upload-artifact@v4
+        with:
+          name: MOEX_Blue_Chips_Trading_Data
+          path: output/MOEX_Blue_Chips_Trading_Data.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
